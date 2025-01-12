@@ -22,6 +22,7 @@ import sys
 import tarfile
 import tempfile
 import zipfile
+import chardet
 
 import urllib.request as url_req
 import xml.etree.cElementTree as xml_et
@@ -1277,13 +1278,21 @@ class HiJson:
 
         self.hi_activity_list = []
 
+    def read_file_with_detected_encoding(self, file_path):
+        with open(file_path, 'rb') as f:
+            raw_data = f.read()
+            encoding = chardet.detect(raw_data).get('encoding', 'utf-8')
+            encoding = encoding if encoding else 'utf-8'
+        with open(file_path, 'r', encoding=encoding) as f:
+            return f.read()
+                
     def parse(self, from_date: datetime.date = datetime.date(1970, 1, 1)) -> list:
         try:
             # Look for HiTrack information in JSON file
 
             # The JSON file from Huawei contains invalid formatting in the 'partTimeMap' data (missing double quotes
             # for the keys). For now, remove the invalid parts using a regular expression.
-            json_string = self.json_file.read()
+            json_string = self.read_file_with_detected_encoding(self.json_file.name)
 
             json_string = re.sub('\"partTimeMap\":{(.*?)},', '', json_string)
 
