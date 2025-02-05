@@ -7,6 +7,12 @@
 [![Buy me a coffee][shield buymeacoffee]][buymeacoffee]
 
 ---------
+## 添加 gcj02 转 WGS84 坐标系模块
+
+导出的无后缀运动记录中开头携带 vendor 属性，对属性为 AMAP 进行坐标转换。使生成的 TCX 文件中的坐标为 WGS84 坐标系。
+坐标转换模块来自 [coordTransform_py](https://github.com/wandergis/coordTransform_py)。
+
+---------
 ## Hitrava is Back (28-Dec-2024)
   
 ### Background
