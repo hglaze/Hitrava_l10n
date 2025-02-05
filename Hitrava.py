@@ -30,6 +30,7 @@ from datetime import datetime as dts
 from datetime import timedelta as dts_delta
 from datetime import timezone as tz
 from zipfile import ZipFile
+from coordTransform_utils import gcj02_to_wgs84
 
 # External libraries that require installation
 from typing import Optional
@@ -123,6 +124,12 @@ class HiActivity:
 
         self.timestamp_ref = timestamp_ref
         self.start_timestamp_ref = start_timestamp_ref
+
+        # Data vendor type express GPS point Type (eg. AMAP)
+        self.data_vendor_type = None
+
+    def set_data_vendor_type(self, __data_vendor_type: str):
+        self.data_vendor_type = __data_vendor_type
 
     @classmethod
     def from_json_pool_swim_data(cls, activity_id: str, start: datetime, json_pool_swim_dict):
@@ -286,6 +293,9 @@ class HiActivity:
 
         # Only add location data with a valid timestamp (ignore GPS loss or pause records at start of the location data)
         if location_data['t']:
+            if self.data_vendor_type == 'AMAP':
+                # Convert GCJ02 to WGS84
+                location_data['lon'], location_data['lat'] = gcj02_to_wgs84(location_data['lon'], location_data['lat'])
             self._add_data_detail(location_data)
 
     def _get_last_location(self) -> Optional[dict]:
@@ -1014,7 +1024,9 @@ class HiTrackFile:
             csv_reader = csv.reader(self.hitrack_file, delimiter=';')
             for line_number, line in enumerate(csv_reader, start=1):
                 data_list.clear()
-                if line[0] == 'tp=lbs':  # Location line format: tp=lbs;k=_;lat=_;lon=_;alt=_;t=_
+                if line[0] == 'vendor=AMAP': # Data vendor line format: vendor;AMAP
+                    self.activity.set_data_vendor_type('AMAP')
+                elif line[0] == 'tp=lbs':  # Location line format: tp=lbs;k=_;lat=_;lon=_;alt=_;t=_
                     for data_index in [5, 2, 3]:  # Parse parameters t, lat, lon parameters (alt not parsed)
                         data_list.append(line[data_index].split('='))  # Parse values after the '=' character
                     self.activity.add_location_data(data_list)
@@ -1354,6 +1366,8 @@ class HiJson:
             raise Exception('Error parsing JSON file <%s>', self.json_file.name)
 
     def _parse_activity(self, activity_dict: dict) -> Optional[HiActivity]:
+        # Get HiTrack GPS data type
+        hitrack_data_type = activity_dict.get('vendor', 'Unknown')
         # Create a HiTrack file from the HiTrack data
         hitrack_data = activity_dict['attribute']
         # Strip prefix and suffix from raw HiTrack data
@@ -1407,6 +1421,7 @@ class HiJson:
             'Saving activity from %s to HiTrack file %s for parsing', activity_start, hitrack_filename)
         try:
             hitrack_file = open(hitrack_filename, 'w+')
+            hitrack_file.write('vendor=' + hitrack_data_type + ';\n')
             hitrack_file.write(hitrack_data)
         except Exception as e:
             logging.getLogger(PROGRAM_NAME).error(
